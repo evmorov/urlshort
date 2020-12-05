@@ -9,43 +9,14 @@ import (
 	"os"
 )
 
+var yamlFilename *string
+var jsonFilename *string
+
 func main() {
-	mux := defaultMux()
-	yamlFilename := flag.String("yaml", "paths.yml", "a yaml file with paths to urls")
-	jsonFilename := flag.String("json", "paths.json", "a json file with paths to urls")
-	flag.Parse()
-
-	pathsToUrls := map[string]string{
-		"/1":              "http://localhost:8080/2",
-		"/urlshort-godoc": "https://godoc.org/github.com/gophercises/urlshort",
-		"/yaml-godoc":     "https://godoc.org/gopkg.in/yaml.v2",
-	}
-	mapHandler := urlshort.MapHandler(pathsToUrls, mux)
-
-	yml, err := ioutil.ReadFile(*yamlFilename)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	yamlHandler, err := urlshort.YAMLHandler(yml, mapHandler)
-	if err != nil {
-		panic(err)
-	}
-
-	json, err := ioutil.ReadFile(*jsonFilename)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	jsonHandler, err := urlshort.JSONHandler(json, yamlHandler)
-	if err != nil {
-		panic(err)
-	}
-
+	parseFlags()
+	handler := jsonHandler(yamlHandler(mapHandler(defaultMux())))
 	fmt.Println("Starting the server on :8080")
-	http.ListenAndServe(":8080", jsonHandler)
+	http.ListenAndServe(":8080", handler)
 }
 
 func defaultMux() *http.ServeMux {
@@ -56,4 +27,45 @@ func defaultMux() *http.ServeMux {
 
 func hello(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "Hello, world")
+}
+
+func parseFlags() {
+	yamlFilename = flag.String("yaml", "paths.yml", "a yaml file with paths to urls")
+	jsonFilename = flag.String("json", "paths.json", "a json file with paths to urls")
+	flag.Parse()
+}
+
+func mapHandler(handler http.Handler) http.HandlerFunc {
+	pathsToUrls := map[string]string{
+		"/1":              "http://localhost:8080/2",
+		"/urlshort-godoc": "https://godoc.org/github.com/gophercises/urlshort",
+		"/yaml-godoc":     "https://godoc.org/gopkg.in/yaml.v2",
+	}
+	return urlshort.MapHandler(pathsToUrls, handler)
+}
+
+func yamlHandler(handler http.Handler) http.HandlerFunc {
+	yml, err := ioutil.ReadFile(*yamlFilename)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	yamlHandler, err := urlshort.YAMLHandler(yml, handler)
+	if err != nil {
+		panic(err)
+	}
+	return yamlHandler
+}
+
+func jsonHandler(handler http.Handler) http.HandlerFunc {
+	json, err := ioutil.ReadFile(*jsonFilename)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	jsonHandler, err := urlshort.JSONHandler(json, handler)
+	if err != nil {
+		panic(err)
+	}
+	return jsonHandler
 }

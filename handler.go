@@ -1,9 +1,15 @@
 package urlshort
 
 import (
+	"encoding/json"
 	"gopkg.in/yaml.v2"
 	"net/http"
 )
+
+type PathToUrls struct {
+	Path string
+	Url  string
+}
 
 func MapHandler(pathsToUrls map[string]string, fallback http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -14,11 +20,6 @@ func MapHandler(pathsToUrls map[string]string, fallback http.Handler) http.Handl
 		}
 		fallback.ServeHTTP(w, r)
 	})
-}
-
-type PathToUrls struct {
-	Path string `yaml:"path"`
-	Url  string `yaml:"url"`
 }
 
 func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
@@ -33,6 +34,21 @@ func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
 func parseYAML(yml []byte) ([]PathToUrls, error) {
 	var out []PathToUrls
 	err := yaml.UnmarshalStrict([]byte(yml), &out)
+	return out, err
+}
+
+func JSONHandler(jsonData []byte, fallback http.Handler) (http.HandlerFunc, error) {
+	parsedJSON, err := parseJSON(jsonData)
+	if err != nil {
+		return nil, err
+	}
+	pathsMap := buildMap(parsedJSON)
+	return MapHandler(pathsMap, fallback), nil
+}
+
+func parseJSON(jsonData []byte) ([]PathToUrls, error) {
+	var out []PathToUrls
+	err := json.Unmarshal(jsonData, &out)
 	return out, err
 }
 

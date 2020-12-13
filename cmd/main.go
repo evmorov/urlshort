@@ -76,20 +76,9 @@ func redisHandler(handler http.Handler) http.HandlerFunc {
 	client := redis.NewClient(&redis.Options{
 		Addr: "localhost:6380",
 	})
-
-	pathsToUrls := make(map[string]string)
-
-	keys, err := client.Keys("*").Result()
+	redisHandler, err := urlshort.RedisHandler(client, handler)
 	if err != nil {
 		panic(err)
 	}
-	for _, key := range keys {
-		val, err := client.Get(key).Result()
-		if err != nil {
-			panic(err)
-		}
-		pathsToUrls[key] = val
-	}
-
-	return urlshort.MapHandler(pathsToUrls, handler)
+	return redisHandler
 }

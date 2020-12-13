@@ -2,6 +2,7 @@ package urlshort
 
 import (
 	"encoding/json"
+	"gopkg.in/redis.v5"
 	"gopkg.in/yaml.v2"
 	"net/http"
 )
@@ -50,6 +51,24 @@ func parseJSON(jsonData []byte) ([]PathToUrls, error) {
 	var out []PathToUrls
 	err := json.Unmarshal(jsonData, &out)
 	return out, err
+}
+
+func RedisHandler(client *redis.Client, fallback http.Handler) (http.HandlerFunc, error) {
+	pathsToUrls := make(map[string]string)
+
+	keys, err := client.Keys("*").Result()
+	if err != nil {
+		return nil, err
+	}
+	for _, key := range keys {
+		val, err := client.Get(key).Result()
+		if err != nil {
+			return nil, err
+		}
+		pathsToUrls[key] = val
+	}
+
+	return MapHandler(pathsToUrls, fallback), nil
 }
 
 func buildMap(pathToUrls []PathToUrls) map[string]string {

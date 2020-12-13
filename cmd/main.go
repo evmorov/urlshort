@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gophercises/urlshort"
+	"gopkg.in/redis.v5"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -14,7 +15,7 @@ var jsonFilename *string
 
 func main() {
 	parseFlags()
-	handler := jsonHandler(yamlHandler(mapHandler(defaultMux())))
+	handler := redisHandler(jsonHandler(yamlHandler(mapHandler(defaultMux()))))
 	fmt.Println("Starting the server on :8080")
 	http.ListenAndServe(":8080", handler)
 }
@@ -51,6 +52,7 @@ func yamlHandler(handler http.Handler) http.HandlerFunc {
 		os.Exit(1)
 	}
 	yamlHandler, err := urlshort.YAMLHandler(yml, handler)
+
 	if err != nil {
 		panic(err)
 	}
@@ -68,4 +70,26 @@ func jsonHandler(handler http.Handler) http.HandlerFunc {
 		panic(err)
 	}
 	return jsonHandler
+}
+
+func redisHandler(handler http.Handler) http.HandlerFunc {
+	client := redis.NewClient(&redis.Options{
+		Addr: "localhost:6380",
+	})
+
+	pathsToUrls := make(map[string]string)
+
+	keys, err := client.Keys("*").Result()
+	if err != nil {
+		panic(err)
+	}
+	for _, key := range keys {
+		val, err := client.Get(key).Result()
+		if err != nil {
+			panic(err)
+		}
+		pathsToUrls[key] = val
+	}
+
+	return urlshort.MapHandler(pathsToUrls, handler)
 }
